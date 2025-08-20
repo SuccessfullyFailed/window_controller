@@ -72,6 +72,11 @@ impl WindowController {
 		self == &WindowController::active()
 	}
 
+	/// Check if the window exists.
+	pub fn exists(&self) -> bool {
+		unsafe { winapi::um::winuser::IsWindow(self.0) != 0 }
+	}
+
 	/// Check if the window is visible.
 	pub fn is_visible(&self) -> bool {
 		unsafe { winapi::um::winuser::IsWindowVisible(self.0) != 0 }

@@ -1,5 +1,12 @@
 use winapi::{ shared::windef::HWND, um::winuser::GetForegroundWindow };
-use std::error::Error;
+use std::{ error::Error, sync::{ Mutex, MutexGuard } };
+
+
+
+static WINDOW_COLLECTOR_LOCK:Mutex<()> = Mutex::new(());
+static mut WINDOW_FILTER:Option<Box<dyn Fn(&WindowController) -> bool>> = None;
+static mut STOP_AFTER_FIRST:bool = false;
+static mut FOUND_WINDOWS:Vec<WindowController> = Vec::new();
 
 
 
@@ -18,6 +25,55 @@ impl WindowController {
 	/// Get a controller from a specific hwnd.
 	pub fn from_hwnd(hwnd:HWND) -> WindowController {
 		WindowController(hwnd)
+	}
+
+	/// Find window by its title.
+	pub fn find_by_title(title:&str) -> Option<WindowController> {
+		let title:String = title.to_string();
+		WindowController::find_one(move |window| window.title().contains(&title))
+	}
+
+	/// Try to find one window matching the given filter.
+	pub fn find_one<T:Fn(&WindowController) -> bool + 'static>(filter:T) -> Option<WindowController> {
+		let found:Vec<WindowController> = WindowController::find(filter, true);
+		if found.is_empty() {
+			None
+		} else {
+			Some(found[0].clone())
+		}
+	}
+
+	/// Find all windows matching the given filter.
+	pub fn find_all<T:Fn(&WindowController) -> bool + 'static>(filter:T) -> Vec<WindowController> {
+		WindowController::find(filter, false)
+	}
+
+	/// Get a controller to all existing windows.
+	#[allow(static_mut_refs)]
+	fn find<T:Fn(&WindowController) -> bool + 'static>(filter:T, find_one:bool) -> Vec<WindowController> {
+		unsafe {
+			let collect_lock:MutexGuard<'_, ()> = WINDOW_COLLECTOR_LOCK.lock().unwrap();
+			WINDOW_FILTER = Some(Box::new(filter));
+			STOP_AFTER_FIRST = find_one;
+			FOUND_WINDOWS = Vec::new();
+			winapi::um::winuser::EnumWindows(Some(WindowController::externally_get_window_controllers), 0);
+			let windows:Vec<WindowController> = FOUND_WINDOWS.clone();
+			drop(collect_lock);
+			windows
+		}
+	}
+	#[allow(static_mut_refs)]
+	unsafe extern "system" fn externally_get_window_controllers(hwnd:HWND, _control_handle:winapi::shared::minwindef::LPARAM) -> winapi::shared::minwindef::BOOL  {
+		unsafe {
+			let controller:WindowController = WindowController(hwnd);
+			if (WINDOW_FILTER.as_ref().unwrap())(&controller) {
+				FOUND_WINDOWS.push(controller);
+				if STOP_AFTER_FIRST {
+					return winapi::shared::minwindef::FALSE;
+				}
+			}
+			winapi::shared::minwindef::TRUE
+		}
 	}
 
 

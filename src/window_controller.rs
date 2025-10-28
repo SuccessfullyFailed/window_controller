@@ -1,5 +1,6 @@
 use winapi::{ shared::windef::HWND, um::winuser::GetForegroundWindow };
 use std::{ error::Error, sync::{ Mutex, MutexGuard } };
+use crate::WindowStyle;
 
 
 
@@ -216,29 +217,6 @@ impl WindowController {
 		[top_left.x, top_left.y, client_rect.right - client_rect.left, client_rect.bottom - client_rect.top]
 	}
 
-	
-
-	/* STYLE ALTERING METHODS */
-
-	/// Update the window.
-	fn apply_style_changes(&self) {
-		use winapi::um::winuser::{ SetWindowPos, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_FRAMECHANGED, SWP_NOACTIVATE };
-
-		unsafe { SetWindowPos(self.0, std::ptr::null_mut(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE); }
-	}
-
-	/// Update the window style.
-	pub fn update_style(&self, extended:bool, style_function:&dyn Fn(u32) -> u32) {
-		use winapi::um::winuser::{ GetWindowLongPtrW, SetWindowLongPtrW, GWL_STYLE, GWL_EXSTYLE };
-
-		unsafe {
-			let style_pointer:i32 = if extended { GWL_EXSTYLE } else { GWL_STYLE };
-			let style:u32 = (style_function)(GetWindowLongPtrW(self.0, style_pointer) as u32);
-			SetWindowLongPtrW(self.0, style_pointer, style as isize);
-			self.apply_style_changes();
-		}
-	}
-
 	/// Do not steal focus when activating.
 	pub fn disable_focus_steal(&self) {
 		use winapi::um::winuser::{ SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE };
@@ -246,35 +224,8 @@ impl WindowController {
 		unsafe { SetWindowPos(self.0, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE); }
 	}
 
-	/// Set a transcolor to the window.
-	pub fn set_transcolor(&self, color:u32) {
-		use winapi::um::winuser::{ GetDC, GetWindowLongPtrW, SetLayeredWindowAttributes, ReleaseDC, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, LWA_COLORKEY };
-		use winapi::shared::windef::HDC__;
-		
-		// Convert color from 0xAARRGGBB to 0xBBGGRR.
-		let color:u32 = (color & 0xFF000000) | ((color & 0xFF) << 16) | (((color >> 8) & 0xFF) << 8) | ((color >> 16) & 0xFF);
-
-		// Apply new style.
-		unsafe {
-			self.update_style(true, &|style| { style | WS_EX_LAYERED | WS_EX_TRANSPARENT });
-			let device_context:*mut HDC__ = GetDC(self.0);
-			GetWindowLongPtrW(self.0, GWL_EXSTYLE);
-			let _success:i32 = SetLayeredWindowAttributes(self.0, color, 0, LWA_COLORKEY);
-			ReleaseDC(self.0, device_context)
-		};
-	}
-
-	/// Toggle the caption of the window.
-	pub fn set_caption(&self, show_caption:bool) {
-		use winapi::um::winuser::WS_CAPTION;
-
-		self.update_style(false, &|style|{ if show_caption { style | WS_CAPTION } else { style & !WS_CAPTION} });
-	}
-
-	/// Toggle the caption of the window.
-	pub fn set_always_on_top(&self, always_on_top:bool) {
-		use winapi::um::winuser::WS_EX_TOPMOST;
-		
-		self.update_style(true, &|style|{ if always_on_top { style | WS_EX_TOPMOST } else { style & !WS_EX_TOPMOST} });
+	/// Get the current style.
+	pub fn style(&self) -> WindowStyle {
+		WindowStyle::new(self.clone())
 	}
 }

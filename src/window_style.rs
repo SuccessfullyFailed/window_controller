@@ -5,7 +5,8 @@ use crate::WindowController;
 pub struct WindowStyle {
 	window:WindowController,
 	style_flags:u32,
-	extended_style_flags:u32
+	extended_style_flags:u32,
+	target_position:Option<[i32; 4]>
 }
 impl WindowStyle {
 
@@ -21,7 +22,8 @@ impl WindowStyle {
 			WindowStyle {
 				window,
 				style_flags: GetWindowLongPtrW(hwnd, GWL_STYLE) as u32,
-				extended_style_flags: GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32
+				extended_style_flags: GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32,
+				target_position: None
 			}
 		}
 	}
@@ -44,10 +46,17 @@ impl WindowStyle {
 
 	/// Apply the updated changes.
 	pub fn apply(&self) {
-		use winapi::um::winuser::{ SetWindowPos, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_FRAMECHANGED, SWP_NOACTIVATE };
+		use winapi::um::winuser::{ SetWindowPos, SetWindowLongPtrW, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_FRAMECHANGED, SWP_NOACTIVATE, GWL_STYLE, GWL_EXSTYLE };
 
 		unsafe {
-			SetWindowPos(self.window.hwnd(), std::ptr::null_mut(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+			SetWindowLongPtrW(self.window.hwnd(), GWL_STYLE, self.style_flags as isize);
+			SetWindowLongPtrW(self.window.hwnd(), GWL_EXSTYLE, self.extended_style_flags as isize);
+
+			if let Some(position) = self.target_position {
+				SetWindowPos(self.window.hwnd(), std::ptr::null_mut(), position[0], position[1], position[0] + position[2], position[1] + position[3], 0);
+			} else {
+				SetWindowPos(self.window.hwnd(), std::ptr::null_mut(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+			}
 		}
 	}
 
@@ -97,6 +106,12 @@ impl WindowStyle {
 			self.remove_style(0, WS_EX_TOPMOST);
 		}
 
+		self
+	}
+
+	/// Set the [x, y, w, h] position of the window.
+	pub fn set_position(&mut self, position:[i32; 4]) -> &mut Self {
+		self.target_position = Some(position);
 		self
 	}
 }

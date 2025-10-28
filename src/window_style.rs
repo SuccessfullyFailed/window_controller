@@ -56,7 +56,7 @@ impl WindowStyle {
 	/* SPECIFIC USAGE METHODS */
 
 	/// Set a trans-color to the window.
-	pub fn set_transcolor(&mut self, color:u32) {
+	pub fn set_transcolor(&mut self, color:u32) -> &mut Self {
 		use winapi::um::winuser::{ GetDC, GetWindowLongPtrW, SetLayeredWindowAttributes, ReleaseDC, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, LWA_COLORKEY };
 		use winapi::shared::windef::HDC__;
 
@@ -70,10 +70,12 @@ impl WindowStyle {
 			let _success:i32 = SetLayeredWindowAttributes(self.window.hwnd(), color_bbggrr, 0, LWA_COLORKEY);
 			ReleaseDC(self.window.hwnd(), device_context)
 		};
+
+		self
 	}
 
 	/// Toggle the caption of the window.
-	pub fn set_caption(&mut self, show_caption:bool) {
+	pub fn set_caption(&mut self, show_caption:bool) -> &mut Self {
 		use winapi::um::winuser::WS_CAPTION;
 
 		if show_caption {
@@ -81,10 +83,12 @@ impl WindowStyle {
 		} else {
 			self.remove_style(WS_CAPTION, 0);
 		}
+
+		self
 	}
 
 	/// Toggle the caption of the window.
-	pub fn set_always_on_top(&mut self, always_on_top:bool) {
+	pub fn set_always_on_top(&mut self, always_on_top:bool) -> &mut Self {
 		use winapi::um::winuser::WS_EX_TOPMOST;
 		
 		if always_on_top {
@@ -92,6 +96,8 @@ impl WindowStyle {
 		} else {
 			self.remove_style(0, WS_EX_TOPMOST);
 		}
+
+		self
 	}
 }
 impl Drop for WindowStyle {

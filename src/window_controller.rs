@@ -165,6 +165,15 @@ impl WindowController {
 		}
 	}
 
+	/// Get the class name of the window.
+	pub fn class(&self) -> String {
+		unsafe {
+			let mut buffer:[u16; 255] = [0u16; 255];
+			let length:i32 = winapi::um::winuser::GetClassNameW(self.0, buffer.as_mut_ptr(), buffer.len() as i32);
+			(0..length as usize).map(|index| buffer[index] as u8 as char).collect::<String>()
+		}
+	}
+
 	/// Get the process name of the window.
 	pub fn process_name(&self) -> Result<String, Box<dyn Error>> {
 		let path:String = self.exe_path()?;

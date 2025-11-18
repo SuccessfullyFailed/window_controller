@@ -1,4 +1,4 @@
-use winapi::{ ctypes::c_void, shared::{ minwindef::DWORD, windef::{ HBITMAP__, HDC__, POINT, RECT } }, um::{ wingdi::{ BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap, CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDIBits, SelectObject }, winuser::{ ClientToScreen, GetClientRect, GetDC, PW_RENDERFULLCONTENT, PrintWindow, ReleaseDC } } };
+use winapi::{ ctypes::c_void, shared::{ minwindef::DWORD, windef::{ HBITMAP__, HDC__ } }, um::{ wingdi::{ BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap, CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDIBits, SelectObject }, winuser::{ GetDC, PW_RENDERFULLCONTENT, PrintWindow, ReleaseDC } } };
 use std::{ error::Error, mem };
 use crate::WindowController;
 
@@ -70,30 +70,20 @@ impl WindowController {
 				ReleaseDC(self.hwnd(), dc);
 				return Err("PrintWindow failed".into());
 			}
-
-			// Find start offset of client area.
-			let mut client:RECT = mem::zeroed();
-			let mut topleft_offset:POINT = POINT { x: client.left, y: client.top };
-			GetClientRect(self.hwnd(), &mut client);
-			ClientToScreen(self.hwnd(), &mut topleft_offset);
-			let padding_left:i32 = topleft_offset.x - bounds[0];
-			let padding_top:i32 = topleft_offset.y - bounds[1];
-			let padded_width:i32 = bounds[2] + padding_left;
-			let padded_height:i32 = bounds[3] + padding_top;
 			
 			// Get the pixel data using GetDIBits.
 			let mut bitmap_info:BITMAPINFO = mem::zeroed();
 			bitmap_info.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as DWORD;
-			bitmap_info.bmiHeader.biWidth = padded_width;
-			bitmap_info.bmiHeader.biHeight = -padded_height;
+			bitmap_info.bmiHeader.biWidth = bounds[2];
+			bitmap_info.bmiHeader.biHeight = -bounds[3];
 			bitmap_info.bmiHeader.biPlanes = 1;
 			bitmap_info.bmiHeader.biBitCount = 32;
 			bitmap_info.bmiHeader.biCompression = BI_RGB;
 			
 			// Create a list of bits.
-			let mut bits:Vec<u8> = vec![0; (padded_width * padded_height * 4) as usize];
-			bits.resize((padded_width * padded_height * 4) as usize, 0u8);
-			let result:i32 = GetDIBits(hdc, hbitmap, 0, padded_height as u32, bits.as_mut_ptr() as *mut c_void, &mut bitmap_info, DIB_RGB_COLORS);
+			let mut bits:Vec<u8> = vec![0; (bounds[2] * bounds[3] * 4) as usize];
+			bits.resize((bounds[2] * bounds[3] * 4) as usize, 0u8);
+			let result:i32 = GetDIBits(hdc, hbitmap, 0, bounds[3] as u32, bits.as_mut_ptr() as *mut c_void, &mut bitmap_info, DIB_RGB_COLORS);
 			if result == 0 {
 				DeleteDC(hdc);
 				ReleaseDC(self.hwnd(), dc);
@@ -102,12 +92,8 @@ impl WindowController {
 			
 			// Convert the raw pixel data to the desired format.
 			let mut pixels:Vec<u32> = vec![0x00000000; (bounds[2] * bounds[3]) as usize];
-			for y in 0..bounds[3] {
-				for x in 0..bounds[1] {
-					let output_index:usize = (y * bounds[2] + x) as usize;
-					let input_index:usize = ((y + padding_top) * padded_width + x + padding_left) as usize;
-					pixels[output_index] = u32::from_be_bytes([0xFF, bits[input_index * 4 + 2], bits[input_index * 4 + 1], bits[input_index * 4]]);
-				}
+			for pixel_index in 0..(bounds[2] * bounds[3]) as usize {
+				pixels[pixel_index] = u32::from_be_bytes([0xFF, bits[pixel_index * 4 + 2], bits[pixel_index * 4 + 1], bits[pixel_index * 4]]);
 			}
 			
 			// Cleanup.

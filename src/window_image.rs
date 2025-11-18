@@ -1,4 +1,4 @@
-use winapi::{ ctypes::c_void, shared::{ minwindef::DWORD, windef::{ HBITMAP__, HDC__ } }, um::{ wingdi::{ BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDIBits, SelectObject }, winuser::{ GetDC, ReleaseDC } } };
+use winapi::{ ctypes::c_void, shared::{ minwindef::DWORD, windef::{ HBITMAP__, HDC__ } }, um::{ wingdi::{ BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleBitmap, CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDIBits, SelectObject }, winuser::{ GetDC, PW_RENDERFULLCONTENT, PrintWindow, ReleaseDC } } };
 use std::{ error::Error, mem };
 use crate::WindowController;
 
@@ -60,13 +60,15 @@ impl WindowController {
 				ReleaseDC(self.hwnd(), dc);
 				return Err("Could not select the bitmap in the device context.".into())
 			}
-			
-			// BitBlt to capture the screen content.
-			let result:i32 = BitBlt(hdc, -bounds[0], -bounds[1], bounds[0] + bounds[2], bounds[1] + bounds[3], dc, 0, 0, 0x00CC0020);
+
+			// Capture image from window to hdc.
+			let result:i32 = PrintWindow(self.hwnd(), hdc, PW_RENDERFULLCONTENT);
 			if result == 0 {
+				SelectObject(hdc, hold);
+				DeleteObject(hbitmap as *mut _);
 				DeleteDC(hdc);
 				ReleaseDC(self.hwnd(), dc);
-				return Err("Image from screen result is 0.".into());
+				return Err("PrintWindow failed".into());
 			}
 			
 			// Get the pixel data using GetDIBits.

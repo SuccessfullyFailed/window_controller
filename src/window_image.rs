@@ -51,7 +51,7 @@ impl WindowController {
 			];
 
 			// Calculate padded width. Contains the requested bounds inside the client area. Bitmap must be large enough to include left and top padding.
-			let padded_size:[i32; 2] = [bounds[2] + padding[0] + padding[2], bounds[3] + padding[1] + padding[3]];
+			let padded_size:[i32; 2] = [bounds[0] + bounds[2] + padding[0] + padding[2], bounds[1] + bounds[3] + padding[1] + padding[3]];
 			if padded_size[0] <= 0 || padded_size[1] <= 0 {
 				return Err("Computed padded size is invalid".into());
 			}
@@ -121,7 +121,7 @@ impl WindowController {
 			let mut pixels:Vec<u32> = vec![0x00000000; (bounds[2] * bounds[3]) as usize];
 			for output_y in 0..bounds[3] {
 				for output_x in 0..bounds[2] {
-					let (input_x, input_y) = (output_x + padding[0], output_y + padding[1]);
+					let (input_x, input_y) = (bounds[0] + padding[0] + output_x, bounds[1] + padding[1] + output_y);
 					let output_index:usize = (output_y * bounds[2] + output_x) as usize;
 					let input_index:usize = (input_y * padded_size[0] + input_x) as usize;
 					pixels[output_index] = u32::from_be_bytes([0xFF, bits[input_index * 4 + 2], bits[input_index * 4 + 1], bits[input_index * 4]]);

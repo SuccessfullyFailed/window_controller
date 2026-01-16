@@ -6,6 +6,7 @@ pub struct WindowStyle {
 	window:WindowController,
 	style_flags:u32,
 	extended_style_flags:u32,
+	always_on_top:bool,
 	target_position:Option<[i32; 4]>
 }
 impl WindowStyle {
@@ -23,6 +24,7 @@ impl WindowStyle {
 				window,
 				style_flags: GetWindowLongPtrW(hwnd, GWL_STYLE) as u32,
 				extended_style_flags: GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32,
+				always_on_top: false,
 				target_position: None
 			}
 		}
@@ -46,17 +48,17 @@ impl WindowStyle {
 
 	/// Apply the updated changes.
 	pub fn apply(&self) {
-		use winapi::um::winuser::{ SetWindowPos, SetWindowLongPtrW, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_FRAMECHANGED, SWP_NOACTIVATE, GWL_STYLE, GWL_EXSTYLE };
+		use winapi::um::winuser::{ SetWindowPos, SetWindowLongPtrW, SWP_NOMOVE, SWP_NOSIZE, SWP_FRAMECHANGED, SWP_NOACTIVATE, GWL_STYLE, GWL_EXSTYLE, HWND_TOPMOST, HWND_NOTOPMOST };
 
 		unsafe {
 			SetWindowLongPtrW(self.window.hwnd(), GWL_STYLE, self.style_flags as isize);
 			SetWindowLongPtrW(self.window.hwnd(), GWL_EXSTYLE, self.extended_style_flags as isize);
 
-			if let Some(position) = self.target_position {
-				SetWindowPos(self.window.hwnd(), std::ptr::null_mut(), position[0], position[1], position[0] + position[2], position[1] + position[3], 0);
-			} else {
-				SetWindowPos(self.window.hwnd(), std::ptr::null_mut(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
-			}
+			let (position, u_flags) = match self.target_position {
+				Some(target_position) => (target_position, 0),
+				None => ([0; 4], SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE)
+			};
+			SetWindowPos(self.window.hwnd(), if self.always_on_top { HWND_TOPMOST } else { HWND_NOTOPMOST }, position[0], position[1], position[0] + position[2], position[1] + position[3], u_flags);
 		}
 	}
 
@@ -98,14 +100,7 @@ impl WindowStyle {
 
 	/// Toggle the caption of the window.
 	pub fn set_always_on_top(&mut self, always_on_top:bool) -> &mut Self {
-		use winapi::um::winuser::WS_EX_TOPMOST;
-		
-		if always_on_top {
-			self.set_style(0, WS_EX_TOPMOST);
-		} else {
-			self.remove_style(0, WS_EX_TOPMOST);
-		}
-
+		self.always_on_top = always_on_top;
 		self
 	}
 
